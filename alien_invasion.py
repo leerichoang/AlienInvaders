@@ -1,9 +1,8 @@
-import sys
 import pygame
 from pygame.sprite import Group
-from settings import Settings
 from game_stats import GameStats
 from scoreboard import Scoreboard
+from settings import Settings
 from button import Button
 from ship import Ship
 from alien import Alien
