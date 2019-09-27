@@ -11,7 +11,7 @@ import game_fuctions as gf
 
 
 def run_game():
-    # Initiatlizes the game and crete a screen obj
+    # Initializes the game and crete a screen obj
     pygame.init()
     ai_settings = Settings()
     screen = pygame.display.set_mode((ai_settings.screen_width, ai_settings.screen_height))
