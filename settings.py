@@ -39,7 +39,6 @@ class Settings:
         f = open("highscore.txt", "r")
         if f.mode == "r":
             self.highscores = f.readline()
-            print(self.highscores)
         f.close()
 
     def increase_speed(self):
@@ -51,7 +50,6 @@ class Settings:
         self.bullets_allowed += 5
         self.ai_shoot_chance *= self.score_scale
         self.alien_points = int(self.alien_points * self.score_scale)
-        print(self.alien_points)
 
     def initialize_dynamic_settings(self):
         """Initialize settings that change throughout the game"""

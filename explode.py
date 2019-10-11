@@ -38,5 +38,4 @@ class Explode(Sprite):
 
     def draw_explode(self):
         # Draw Explosion on the screen
-        print("BOOM at " + str(self.rect.x) + " , " + str(self.rect.y))
         self.screen.blit(self.image, self.rect)

@@ -169,7 +169,6 @@ def check_laser_player_collisions(ai_settings, screen, stats, sb, ship, aliens, 
 
 def update_explosions(explosions):
     explosions.update()
-    print("Updating to next index")
     for explosion in explosions.copy():
         if explosion.explode_index >= 5:
             explosions.remove(explosion)
@@ -263,7 +262,6 @@ def update_screen(ai_settings, screen, stats, sb, ship, aliens, bullets, lasers,
     # Redraw all bullets behind he ship and aliens
     for explosion in explosions.sprites():
         explosion.draw_explode()
-        print("Drawing Explosions")
     for bullet in bullets.sprites():
         bullet.draw_bullet()
     for shield in shields.sprites():
