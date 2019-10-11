@@ -1,9 +1,12 @@
 import sys
 from time import sleep
-
 import pygame
 from bullet import Bullet
+from laser import Laser
 from alien import Alien
+from explode import Explode
+from shields import Shields
+from random import *
 
 
 def check_high_score(stats, sb):
@@ -36,7 +39,7 @@ def check_play_button(ai_settings, screen, stats, sb, play_button, ship, aliens,
         bullets.empty()
 
         # Create a new fleet and center the ship
-        create_fleet(ai_settings, screen, ship, aliens)
+        create_fleet(ai_settings, screen, aliens)
         ship.center_ship()
 
 
@@ -55,7 +58,7 @@ def change_fleet_direction(ai_settings, aliens):
     ai_settings.fleet_direction *= -1
 
 
-def ship_hit(ai_settings, screen, stats, sb, ship, aliens, bullets):
+def ship_hit(ai_settings, screen, stats, sb, ship, aliens, bullets, lasers):
     """Respond to ship being hit by alien"""
     if stats.ship_left > 0:
         # Decreatse ship_left
@@ -64,12 +67,12 @@ def ship_hit(ai_settings, screen, stats, sb, ship, aliens, bullets):
         # Update scoreboard
         sb.prep_ships()
 
-        # Empty the list of aliens and bullets
+        # Empty the list of aliens, bullets, lasers, explosions
         aliens.empty()
         bullets.empty()
-
-        # Creata ne new fleet and center the ship
-        create_fleet(ai_settings, screen, ship, aliens)
+        lasers.empty()
+        # Create a new fleet and center the ship
+        create_fleet(ai_settings, screen, aliens)
         ship.center_ship()
 
         # Pause
@@ -79,17 +82,22 @@ def ship_hit(ai_settings, screen, stats, sb, ship, aliens, bullets):
         pygame.mouse.set_visible(True)
 
 
-def check_aliens_bottom(ai_settings, screen, stats, sb, ship, aliens, bullets):
+def check_aliens_bottom(ai_settings, screen, stats, sb, ship, aliens, bullets, lasers):
     """Check if any aliens have reached the bottom of the screen"""
     screen_rect = screen.get_rect()
     for alien in aliens.sprites():
         if alien.rect.bottom >= screen_rect.bottom:
             # Treat this the same as if the shit got hit
-            ship_hit(ai_settings, screen, stats, sb, ship, aliens, bullets)
+            ship_hit(ai_settings=ai_settings, screen=screen, stats=stats, sb=sb, ship=ship, aliens=aliens,
+                     bullets=bullets, lasers=lasers)
             break
 
 
-def update_aliens(ai_settings, screen, stats, sb, ship, aliens, bullets):
+def check_collision_alien_wall(aliens, shields):
+    pygame.sprite.groupcollide(aliens, shields, False, True)
+
+
+def update_aliens(ai_settings, screen, stats, sb, ship, aliens, bullets, lasers, explosions, shields):
     # Check if the fleet is at an edge
     # Then updates the position of all aliens in the fleet
     check_fleet_edges(ai_settings, aliens)
@@ -97,19 +105,38 @@ def update_aliens(ai_settings, screen, stats, sb, ship, aliens, bullets):
 
     # Look for alien-ship collision
     if pygame.sprite.spritecollideany(ship, aliens):
-        ship_hit(ai_settings, screen, stats, sb, ship, aliens, bullets)
-
+        destruction = Explode(ai_settings=ai_settings, screen=screen, ship=ship)
+        explosions.add(destruction)
+        ship_hit(ai_settings=ai_settings, screen=screen, stats=stats, sb=sb, ship=ship, aliens=aliens,
+                 bullets=bullets, lasers=lasers)
+    check_collision_alien_wall(aliens, shields)
     # Look for aliens hitting the bottom of the screen
-    check_aliens_bottom(ai_settings, screen, stats, sb, ship, aliens, bullets)
+    check_aliens_bottom(ai_settings=ai_settings, screen=screen, stats=stats, sb=sb, ship=ship, aliens=aliens,
+                        bullets=bullets, lasers=lasers)
 
 
-def check_bullet_alien_collisions(ai_settings, screen, stats, sb, ship, aliens, bullets):
+def check_bullet_player_collisions(ai_settings, screen, stats, sb, ship, aliens,  bullets, ai_bullets, explosions):
+    """Respond to bullet-player collision."""
+    # Check for any bullets that hits the player
+    # if so, get rid of bullets and player
+    collisions = pygame.sprite.groupcollide(ai_bullets, ship, True, True)
+    if collisions:
+        destruction = Explode(ai_settings=ai_settings, screen=screen, ship=ship)
+        explosions.add(destruction)
+        ship_hit(ai_settings=ai_settings, screen=screen, stats=stats, sb=sb, ship=ship, aliens=aliens,
+                 bullets=bullets, lasers=ai_bullets)
+
+
+def check_bullet_alien_collisions(ai_settings, screen, stats, sb, aliens, bullets, explosions):
     """Respond to bullet-alien collision."""
     # Check for any bullets that hae hit aliens
     # if so, get rid of the bullets and the alien
     collisions = pygame.sprite.groupcollide(bullets, aliens, True, True)
     if collisions:
         for aliens in collisions.values():
+            for alien in aliens:
+                destruction = Explode(ai_settings=ai_settings, screen=screen, ship=alien)
+                explosions.add(destruction)
             stats.score += ai_settings.alien_points * len(aliens)
             sb.prep_score()
         check_high_score(stats, sb)
@@ -123,10 +150,45 @@ def check_bullet_alien_collisions(ai_settings, screen, stats, sb, ship, aliens, 
         stats.level += 1
         sb.prep_level()
 
-        create_fleet(ai_settings, screen, ship, aliens)
+        create_fleet(ai_settings, screen, aliens)
 
 
-def update_bullets(ai_settings, screen, stats, sb, ship, aliens, bullets):
+def check_projectile_shields_collision(projectile, shields):
+    pygame.sprite.groupcollide(projectile, shields, True, True)
+
+
+def check_laser_player_collisions(ai_settings, screen, stats, sb, ship, aliens, bullets, lasers):
+    """Respond to laser-player collision."""
+    # Check for any lasers that have hit player
+    # if so, get rid of the alien and player
+    collisions = pygame.sprite.spritecollideany(sprite=ship, group=lasers)
+    if collisions:
+        ship_hit(ai_settings=ai_settings, screen=screen, stats=stats, sb=sb, ship=ship, aliens=aliens, bullets=bullets,
+                 lasers=lasers)
+
+
+def update_explosions(explosions):
+    explosions.update()
+    print("Updating to next index")
+    for explosion in explosions.copy():
+        if explosion.explode_index >= 5:
+            explosions.remove(explosion)
+
+
+def update_laser(ai_settings, screen, stats, sb, ship, aliens, bullets, lasers, shields):
+    # Update position of laser and gets reid of old lasers
+    lasers.update()
+
+    # Get rid of lasers that have diasspeared
+    for laser in lasers.copy():
+        if laser.rect.bottom >= ai_settings.screen_height:
+            lasers.remove(laser)
+    check_projectile_shields_collision(projectile=lasers, shields=shields)
+    check_laser_player_collisions(ai_settings=ai_settings, screen=screen, stats=stats, sb=sb, ship=ship, aliens=aliens,
+                                  bullets=bullets, lasers=lasers)
+
+
+def update_bullets(ai_settings, screen, stats, sb, aliens, bullets, explosions, shields):
     # Update position of bullets and get rid of old bullets
     # Update bullet positions
     bullets.update()
@@ -135,7 +197,19 @@ def update_bullets(ai_settings, screen, stats, sb, ship, aliens, bullets):
     for bullet in bullets.copy():
         if bullet.rect.bottom <= 0:
             bullets.remove(bullet)
-    check_bullet_alien_collisions(ai_settings, screen, stats, sb, ship, aliens, bullets)
+
+    check_projectile_shields_collision(projectile=bullets, shields=shields)
+
+    check_bullet_alien_collisions(ai_settings=ai_settings, screen=screen, stats=stats, sb=sb, aliens=aliens,
+                                  bullets=bullets, explosions=explosions)
+
+
+def fire_laser(ai_settings, screen, aliens, lasers):
+    for alien in aliens:
+        if randrange(100) < alien.shoot_percentage:
+            if len(lasers) < ai_settings.ai_max_lasers:
+                new_laser = Laser(ai_settings, screen, alien)
+                lasers.add(new_laser)
 
 
 def fire_bullet(ai_settings, screen, ship, bullets):
@@ -181,17 +255,23 @@ def check_events(ai_settings, screen, stats, sb, play_button, ship, aliens, bull
             check_play_button(ai_settings, screen, stats, sb, play_button, ship, aliens, bullets, mouse_x, mouse_y)
 
 
-def update_screen(ai_settings, screen, stats, sb, ship, aliens, bullets, play_button):
+def update_screen(ai_settings, screen, stats, sb, ship, aliens, bullets, lasers, play_button, explosions, shields):
     # update images on the screen and flip to new screen
     # redraw the screen during each pass through the loop
-    screen.fill(ai_settings.bg_color)
+    screen.fill(ai_settings.bgcolor)
 
     # Redraw all bullets behind he ship and aliens
+    for explosion in explosions.sprites():
+        explosion.draw_explode()
+        print("Drawing Explosions")
     for bullet in bullets.sprites():
         bullet.draw_bullet()
+    for shield in shields.sprites():
+        shield.draw()
+    for laser in lasers.sprites():
+        laser.draw_laser()
     ship.blitme()
     aliens.draw(screen)
-
     # Draw the score information
     sb.show_score()
 
@@ -227,15 +307,47 @@ def create_alien(ai_settings, screen, aliens, alien_number, row_number):
     aliens.add(alien)
 
 
-def create_fleet(ai_settings, screen, ship, aliens):
+def create_fleet(ai_settings, screen, aliens):
     # Create a full fleet of aliens
     # Create an alien and find the number of aliens ina row
-    # Spacing betwen eahc alien is equal to one alie width
-    alien = Alien(ai_settings, screen)
-    number_aliens_x = get_number_aliens_x(ai_settings, alien.rect.width)
-    number_rows = get_number_rows(ai_settings, ship.rect.height, alien.rect.height)
+    # Spacing between each alien is equal to one alie width
+    # alien = Alien(ai_settings, screen)
+    number_aliens_x = 11
+    number_rows = 5
 
     # Create the fleets
     for row_number in range(number_rows):
         for alien_number in range(number_aliens_x):
             create_alien(ai_settings, screen, aliens, alien_number, row_number)
+
+
+def create_walls(ai_settings, screen, shields):
+    # Create left wall
+    for i in range(0, 17):
+        for j in range(0, 6):
+            shield = Shields(ai_settings=ai_settings, screen=screen)
+            shield.rect.x = (shield.rect.width * i) + 100
+            shield.rect.y = (screen.get_rect().height - 100) + (shield.rect.height * j)
+            shields.add(shield)
+
+    # Create middle right wall
+    for i in range(0, 16):
+        for j in range(0, 6):
+            shield = Shields(ai_settings=ai_settings, screen=screen)
+            shield.rect.x = (shield.rect.width * i) + screen.get_rect().centerx + 150
+            shield.rect.y = (screen.get_rect().height - 100) + (shield.rect.height * j)
+            shields.add(shield)
+
+    # Create middle middle wall
+    for i in range(0, 9):
+        for j in range(0, 6):
+            shield = Shields(ai_settings=ai_settings, screen=screen)
+            shield.rect.x = (shield.rect.width * i) + screen.get_rect().centerx
+            shield.rect.y = (screen.get_rect().height - 100) + (shield.rect.height * j)
+            shields.add(shield)
+
+        for j in range(0, 6):
+            shield = Shields(ai_settings=ai_settings, screen=screen)
+            shield.rect.x = screen.get_rect().centerx - (shield.rect.width * i)
+            shield.rect.y = (screen.get_rect().height - 100) + (shield.rect.height * j)
+            shields.add(shield)

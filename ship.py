@@ -10,8 +10,21 @@ class Ship(Sprite):
         self.screen = screen
         self.ai_settings = ai_settings
 
+        # set Ship clocks
+        self.ship_index = 0
+        self.ship_nextframe = 60
+        self.ship_clock = pygame.time.get_ticks() + self.ship_nextframe
+        self.image_index = [pygame.image.load('images/ship/frontship000.png'),
+                            pygame.image.load('images/ship/frontship001.png')]
+        self.imageleft_index = [pygame.image.load('images/ship/leftship000.png'),
+                                pygame.image.load('images/ship/leftship001.png')]
+        self.imageright_index = [pygame.image.load('images/ship/rightship000.png'),
+                                 pygame.image.load('images/ship/rightship001.png')]
         # Load the ship image and get its rect.
-        self.image = pygame.image.load('images/ship.bmp')
+        # self.image = pygame.image.load('images/ship.bmp')
+        self.image = self.image_index[self.ship_index]
+        self.image = pygame.transform.scale(self.image, (30, 30))
+
         self.rect = self.image.get_rect()
         self.screen_rect = screen.get_rect()
 
@@ -36,6 +49,21 @@ class Ship(Sprite):
 
         # Update react object from self.center
         self.rect.centerx = self.center
+        if pygame.time.get_ticks() > self.ship_clock and self.moving_right:
+            self.ship_index = (self.ship_index + 1) % len(self.image_index)
+            self.image = self.imageright_index[self.ship_index]
+            self.image = pygame.transform.scale(self.image, (30, 30))
+            self.ship_clock = pygame.time.get_ticks() + self.ship_nextframe
+        elif pygame.time.get_ticks() > self.ship_clock and self.moving_left:
+            self.ship_index = (self.ship_index + 1) % len(self.image_index)
+            self.image = self.imageleft_index[self.ship_index]
+            self.image = pygame.transform.scale(self.image, (30, 30))
+            self.ship_clock = pygame.time.get_ticks() + self.ship_nextframe
+        elif pygame.time.get_ticks() > self.ship_clock:
+            self.ship_index = (self.ship_index + 1) % len(self.image_index)
+            self.image = self.image_index[self.ship_index]
+            self.image = pygame.transform.scale(self.image, (30, 30))
+            self.ship_clock = pygame.time.get_ticks() + self.ship_nextframe
 
     def blitme(self):
         # Draw the ship at its current location

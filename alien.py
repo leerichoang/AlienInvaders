@@ -11,8 +11,18 @@ class Alien(Sprite):
         self.screen = screen
         self.ai_settings = ai_settings
 
+        # Set alien default values
+        self.shoot_percentage = 10
+        self.alien_index = 0
+        self.alien_nextframe = 80
+        self.alien_clock = pygame.time.get_ticks() + self.alien_nextframe
+        self.image_index = [pygame.image.load('images/spritesheets/smallalien000.png'),
+                            pygame.image.load('images/spritesheets/smallalien001.png')]
+
+        self.image = self.image_index[self.alien_index]
+        self.image = pygame.transform.scale(self.image, (30, 30))
+
         # Load the alien image and set its rect attribute
-        self.image = pygame.image.load('images/alien.bmp')
         self.rect = self.image.get_rect()
 
         # Start each new alien near the top left of the screen
@@ -38,3 +48,10 @@ class Alien(Sprite):
         # Move Aliens to right or left
         self.x += (self.ai_settings.alien_speed_factor * self.ai_settings.fleet_direction)
         self.rect.x = self.x
+
+        # check if the time for alien image change
+        if pygame.time.get_ticks() > self.alien_clock:
+            self.alien_index = (self.alien_index + 1) % len(self.image_index)
+            self.image = self.image_index[self.alien_index]
+            self.image = pygame.transform.scale(self.image, (30, 30))
+            self.alien_clock = pygame.time.get_ticks() + self.alien_nextframe
